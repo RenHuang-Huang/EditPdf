@@ -1,4 +1,4 @@
-.pdf-page-container {
+.pdf-page {
     position: relative;
     display: inline-block;
     margin: 1rem auto;
@@ -20,21 +20,21 @@
     z-index: 2;
 }
 
-.pdf-page-container.tool-select {
+.pdf-page.tool-select {
     cursor: default;
 }
 
-.pdf-page-container.tool-text {
+.pdf-page.tool-text {
     cursor: text;
 }
 
-.pdf-page-container.tool-rect,
-.pdf-page-container.tool-pen,
-.pdf-page-container.tool-line {
+.pdf-page.tool-rect,
+.pdf-page.tool-pen,
+.pdf-page.tool-line {
     cursor: crosshair;
 }
 
-.pdf-page-container.tool-eraser {
+.pdf-page.tool-eraser {
     cursor: cell;
     /* or custom eraser cursor */
 }

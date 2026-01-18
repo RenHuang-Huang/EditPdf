@@ -234,7 +234,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
     return (
         <div
-            className="pdf-page"
+            className={`pdf-page tool-${toolStr.activeTool}`}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             ref={containerRef}
