@@ -1,0 +1,114 @@
+.page-navigation {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.nav-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-input-form {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0 0.5rem;
+}
+
+.page-input {
+    width: 60px;
+    padding: 0.4rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.page-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.page-total {
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.rotation-buttons {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0 0.5rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.rotation-indicator {
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 500;
+    min-width: 35px;
+    text-align: center;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    margin-left: auto;
+}
+
+.search-icon {
+    color: #666;
+}
+
+.search-input {
+    border: none;
+    background: transparent;
+    font-size: 0.9rem;
+    width: 200px;
+    outline: none;
+}
+
+.search-input::placeholder {
+    color: #999;
+}

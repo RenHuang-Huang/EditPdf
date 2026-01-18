@@ -1,0 +1,31 @@
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+    z-index: 40;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-item strong {
+    font-weight: 500;
+    color: #374151;
+}
+
+.status-separator {
+    color: #d1d5db;
+}

@@ -1,0 +1,114 @@
+.pdf-page-container {
+    position: relative;
+    display: inline-block;
+    margin: 1rem auto;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.pdf-page canvas {
+    display: block;
+}
+
+.annotation-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    /* CRITICAL: Enable mouse events */
+    z-index: 2;
+}
+
+.pdf-page-container.tool-select {
+    cursor: default;
+}
+
+.pdf-page-container.tool-text {
+    cursor: text;
+}
+
+.pdf-page-container.tool-rect,
+.pdf-page-container.tool-pen,
+.pdf-page-container.tool-line {
+    cursor: crosshair;
+}
+
+.pdf-page-container.tool-eraser {
+    cursor: cell;
+    /* or custom eraser cursor */
+}
+
+/* Base annotation styles */
+.annotation {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: box-shadow 0.2s, filter 0.2s;
+}
+
+/* Hover effect for unselected items */
+.annotation:hover:not(.selected) {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    /* Blue-ish outline */
+    z-index: 50;
+    /* Bring to front on hover */
+}
+
+/* SVG Path Hover */
+.annotation-path {
+    transition: stroke-width 0.2s;
+}
+
+/* For SVG, we can't easily use box-shadow on the path. 
+   We'll use filter for drop-shadow on the svg container if it were tight, 
+   but the container is full page. 
+   So we target the path itself. */
+.annotation-path:hover {
+    filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.8));
+    stroke-opacity: 0.8;
+}
+
+.annotation.text {
+    white-space: pre;
+    line-height: 1;
+    user-select: none;
+    padding: 2px;
+    /* Add padding so hover box isn't flush against text */
+}
+
+.annotation.rect {
+    background: transparent;
+    border-style: solid;
+}
+
+.annotation.selected {
+    z-index: 100;
+}
+
+/* PDF Text Layer Styles - Enable text selection */
+.react-pdf__Page__textContent {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    opacity: 0.2 !important;
+    line-height: 1 !important;
+    pointer-events: auto !important;
+    z-index: 1 !important;
+}
+
+.react-pdf__Page__textContent span {
+    color: transparent !important;
+    position: absolute !important;
+    white-space: pre !important;
+    cursor: text !important;
+    transform-origin: 0% 0% !important;
+}
+
+.react-pdf__Page__textContent ::selection {
+    background: rgba(0, 123, 255, 0.3) !important;
+    color: rgba(0, 0, 0, 0.8) !important;
+}
