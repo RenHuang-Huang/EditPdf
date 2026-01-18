@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
-import type { Annotation, EditorState, ToolType, FontFamily, TextAnnotation } from '../types';
+import type { Annotation, EditorState, ToolType, TextAnnotation } from '../types';
 import { PdfPage } from './PdfPage';
 import { Toolbar } from './Toolbar';
 import { LoadingOverlay } from './LoadingOverlay';
@@ -22,7 +22,7 @@ interface PdfEditorProps {
     onBack: () => void;
 }
 
-export const PdfEditor: React.FC<PdfEditorProps> = ({ file, onBack }) => {
+export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
     const [numPages, setNumPages] = useState<number>(0);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [isExporting, setIsExporting] = useState(false);
@@ -369,8 +369,70 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file, onBack }) => {
         }
     };
 
+    // Drop Handler for Images
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const files = Array.from(e.dataTransfer.files);
+        const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+        if (imageFiles.length === 0) return;
+
+        // Get drop coordinates relative to the viewport/page?
+        // This is tricky because drop event target might be the document wrapper.
+        // For simplicity, let's just add it to the active page at (50, 50).
+        // Or try to infer page?
+
+        // Let's assume activePage for now.
+        const file = imageFiles[0];
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = () => {
+            // Default size, but limit if too huge
+            let w = img.width;
+            let h = img.height;
+            const maxSize = 200; // reasonable default size
+
+            if (w > h && w > maxSize) {
+                h = (h * maxSize) / w;
+                w = maxSize;
+            } else if (h > maxSize) {
+                w = (w * maxSize) / h;
+                h = maxSize;
+            }
+
+            const newAnn: Annotation = {
+                id: nanoid(),
+                type: 'image',
+                page: activePage,
+                x: 100, // Default position
+                y: 100,
+                width: w,
+                height: h,
+                file: file,
+                rotation: 0,
+                opacity: 1
+            };
+
+            addAnnotation(newAnn);
+            URL.revokeObjectURL(objectUrl);
+        };
+        img.src = objectUrl;
+    };
+
     return (
-        <div className="pdf-editor">
+        <div
+            className="pdf-editor"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
             <Toolbar
                 state={state}
                 onStateChange={setState}

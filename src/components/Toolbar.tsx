@@ -1,10 +1,9 @@
 import React from 'react';
 import {
-    MousePointer2, Type, PenTool, Square, Eraser,
-    Minus, Plus, Download, Slash, FileText, ScanText,
+    MousePointer2, Type, PenTool, Square, Minus, Download, Slash, FileText, ScanText,
     Highlighter, Undo2, Redo2, ZoomIn, ZoomOut
 } from 'lucide-react';
-import type { ToolType, EditorState, FontFamily } from '../types';
+import type { EditorState, FontFamily } from '../types';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -118,8 +117,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                         <span className="value-label">{state.activeStrokeWidth}px</span>
                     </div>
 
-                    {/* Opacity Slider for Highlighter/Pen */}
-                    {(state.activeTool === 'highlighter' || state.activeTool === 'pen') && (
+                    {/* Opacity Slider for Highlighter/Pen/Rect */}
+                    {(state.activeTool === 'highlighter' || state.activeTool === 'pen' || state.activeTool === 'rect') && (
                         <div className="property-item">
                             <label style={{ fontSize: '12px', marginRight: '8px' }}>透明度</label>
                             <input

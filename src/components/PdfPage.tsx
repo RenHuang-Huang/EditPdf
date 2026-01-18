@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Page } from 'react-pdf';
-import type { Annotation, EditorState } from '../types';
+import type { Annotation, EditorState, ImageAnnotation } from '../types';
 import { nanoid } from 'nanoid';
+import { getSmoothedPath } from '../utils/geometry';
 import './PdfPage.css';
 
 interface PdfPageProps {
@@ -24,8 +25,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
     onAddAnnotation,
     onUpdateAnnotation,
     onAnnotationChangeEnd,
-    onSelectAnnotation,
-    onEditAnnotation
+    onSelectAnnotation
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [drawingId, setDrawingId] = useState<string | null>(null);
@@ -47,11 +47,9 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
         // Click-to-deselect: if 'select' tool is active and user clicks background, deselect
         if (toolStr.activeTool === 'select') {
-            // Check if click target is the canvas itself (not an annotation element)
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('pdf-page') || target.classList.contains('annotation-layer')) {
-                onSelectAnnotation(''); // Deselect by passing empty ID
-            }
+            // Since individual annotations call e.stopPropagation(), 
+            // any click that reaches here must be on the empty background.
+            onSelectAnnotation('');
             return;
         }
 
@@ -148,16 +146,32 @@ export const PdfPage: React.FC<PdfPageProps> = ({
             const current = annotations.find(a => a.id === dragState.id);
             if (!current) return;
 
-            // Handle Rect/Text (Simple x/y update)
-            if (current.type === 'text' || current.type === 'rect') {
+            // Handle Rect/Text/Image (Simple x/y update)
+            if (current.type === 'text' || current.type === 'rect' || current.type === 'image') {
                 onUpdateAnnotation(dragState.id, {
                     x: x - dragState.offsetX,
                     y: y - dragState.offsetY
                 });
             }
 
-            // Handle Paths (Pen/Line) - Need to shift all points
-            if ((current.type === 'pen' || current.type === 'line') && current.paths) {
+            // Handle Line - Shift start and end points
+            if (current.type === 'line') {
+                const newX = x - dragState.offsetX;
+                const newY = y - dragState.offsetY;
+                const deltaX = newX - current.x;
+                const deltaY = newY - current.y;
+
+                onUpdateAnnotation(dragState.id, {
+                    x: newX,
+                    y: newY,
+                    x2: (current.x2 || 0) + deltaX,
+                    y2: (current.y2 || 0) + deltaY
+                });
+                return;
+            }
+
+            // Handle Paths (Pen/Highlighter) - Need to shift all points
+            if ((current.type === 'pen' || current.type === 'highlighter') && current.paths) {
                 // For paths, we need to update all points relative to the new position
                 // Calculate the delta from the original start point to the new mouse position
                 const newX = x - dragState.offsetX;
@@ -183,7 +197,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
         if (toolStr.activeTool === 'pen') {
             const current = annotations.find(a => a.id === drawingId);
-            if (current && current.paths) {
+            if (current && (current.type === 'pen' || current.type === 'highlighter') && current.paths) {
                 onUpdateAnnotation(drawingId, {
                     paths: [...current.paths, { x, y }]
                 });
@@ -192,7 +206,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
         if (toolStr.activeTool === 'rect') {
             const current = annotations.find(a => a.id === drawingId);
-            if (current) {
+            if (current && current.type === 'rect') {
                 onUpdateAnnotation(drawingId, {
                     width: x - current.x,
                     height: y - current.y
@@ -202,23 +216,25 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
         if (toolStr.activeTool === 'line') {
             const current = annotations.find(a => a.id === drawingId);
-            if (current && current.paths) {
+            if (current && current.type === 'line') {
                 let finalX = x;
                 let finalY = y;
 
                 if (e.shiftKey) {
-                    const start = current.paths[0];
-                    const dx = Math.abs(x - start.x);
-                    const dy = Math.abs(y - start.y);
+                    const startX = current.x;
+                    const startY = current.y;
+                    const dx = Math.abs(x - startX);
+                    const dy = Math.abs(y - startY);
                     if (dx > dy) {
-                        finalY = start.y;
+                        finalY = startY;
                     } else {
-                        finalX = start.x;
+                        finalX = startX;
                     }
                 }
 
                 onUpdateAnnotation(drawingId, {
-                    paths: [current.paths[0], { x: finalX, y: finalY }]
+                    x2: finalX,
+                    y2: finalY
                 });
             }
         }
@@ -231,6 +247,54 @@ export const PdfPage: React.FC<PdfPageProps> = ({
         setDrawingId(null);
         setDragState(null);
     };
+
+    // Extract ImageNode to avoid re-creating ObjectURL on every render
+    const ImageNode = React.memo(({ ann, isSelected, onMouseDown }: { ann: ImageAnnotation, isSelected: boolean, onMouseDown: (e: React.MouseEvent) => void }) => {
+        const [src, setSrc] = useState<string | null>(null);
+
+        useEffect(() => {
+            if (!ann.file) return;
+            const objectUrl = URL.createObjectURL(ann.file);
+            setSrc(objectUrl);
+            return () => URL.revokeObjectURL(objectUrl);
+        }, [ann.file]);
+
+        if (!src) return null;
+
+        const styleBase = {
+            position: 'absolute' as const,
+            cursor: toolStr.activeTool === 'select' ? 'move' : 'pointer',
+            boxShadow: isSelected ? '0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.2)' : 'none'
+        };
+
+        return (
+            <div
+                className={`annotation image ${isSelected ? 'selected' : ''}`}
+                style={{
+                    ...styleBase,
+                    left: ann.x,
+                    top: ann.y,
+                    width: ann.width,
+                    height: ann.height,
+                    pointerEvents: 'auto'
+                }}
+                onMouseDown={onMouseDown}
+            >
+                <img
+                    src={src}
+                    alt="annotation"
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        opacity: ann.opacity || 1,
+                        pointerEvents: 'none', // Let dragged events pass to container? No, container has pointerEvents auto.
+                        userSelect: 'none'
+                    }}
+                />
+            </div>
+        );
+    });
 
     return (
         <div
@@ -300,8 +364,19 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                         );
                     }
 
+                    if (ann.type === 'image') {
+                        return (
+                            <ImageNode
+                                key={ann.id}
+                                ann={ann}
+                                isSelected={isSelected}
+                                onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.x, ann.y)}
+                            />
+                        );
+                    }
+
                     if ((ann.type === 'pen' || ann.type === 'highlighter') && ann.paths) {
-                        const pathData = ann.paths.map((p: any, i: number) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                        const pathData = getSmoothedPath(ann.paths);
                         return (
                             <svg key={ann.id} className={`annotation path-container ${isSelected ? 'selected' : ''}`} style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
                                 <path

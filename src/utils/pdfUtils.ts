@@ -1,6 +1,7 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import type { Annotation, TextOverlayAnnotation } from '../types';
+import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
+import { getSmoothedPath } from './geometry';
 
 /**
  * Enhanced PDF export with text overlay support
@@ -18,12 +19,12 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
         // Try to load Chinese font if available
         let chineseFont = helveticaFont;
         try {
-            const notoSansResponse = await fetch('/NotoSansTC-Regular.ttf');
+            const notoSansResponse = await fetch('/NotoSansTC-Regular.otf');
             if (notoSansResponse.ok) {
                 const notoSansFontBytes = await notoSansResponse.arrayBuffer();
                 chineseFont = await pdfDoc.embedFont(notoSansFontBytes);
             }
-        } catch (e) {
+        } catch {
             console.warn('Chinese font not available, using Helvetica');
         }
 
@@ -36,6 +37,35 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
             const { height: pageHeight } = page.getSize();
 
             // Handle text overlays (NEW!)
+            if (annotation.type === 'image') {
+                const imageAnn = annotation as ImageAnnotation;
+                try {
+                    const imageBytes = await imageAnn.file.arrayBuffer();
+                    let image;
+                    // Detect type strictly or try-catch both
+                    // file.type should be reliable
+                    if (imageAnn.file.type === 'image/jpeg' || imageAnn.file.type === 'image/jpg') {
+                        image = await pdfDoc.embedJpg(imageBytes);
+                    } else {
+                        // Fallback to PNG for everything else (or try embedPng)
+                        // Note: pdf-lib only supports PNG/JPG. 
+                        // If file is WebP, it might fail. Ideally convert, but for MVP just try.
+                        image = await pdfDoc.embedPng(imageBytes);
+                    }
+
+                    page.drawImage(image, {
+                        x: imageAnn.x,
+                        y: pageHeight - imageAnn.y - imageAnn.height,
+                        width: imageAnn.width,
+                        height: imageAnn.height,
+                        opacity: imageAnn.opacity || 1
+                    });
+                } catch (e) {
+                    console.error('Failed to embed image:', e);
+                }
+                continue;
+            }
+
             if (annotation.type === 'textOverlay') {
                 const overlay = annotation as TextOverlayAnnotation;
 
@@ -74,9 +104,9 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     size: annotation.fontSize || 16,
                     font: font,
                     color: rgb(
-                        parseInt(annotation.strokeColor.slice(1, 3), 16) / 255,
-                        parseInt(annotation.strokeColor.slice(3, 5), 16) / 255,
-                        parseInt(annotation.strokeColor.slice(5, 7), 16) / 255
+                        parseInt((annotation.strokeColor || '#000000').slice(1, 3), 16) / 255,
+                        parseInt((annotation.strokeColor || '#000000').slice(3, 5), 16) / 255,
+                        parseInt((annotation.strokeColor || '#000000').slice(5, 7), 16) / 255
                     )
                 });
             }
@@ -117,17 +147,16 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     parseInt(annotation.strokeColor!.slice(5, 7), 16) / 255
                 );
 
-                for (let i = 0; i < annotation.paths.length - 1; i++) {
-                    const p1 = annotation.paths[i];
-                    const p2 = annotation.paths[i + 1];
-                    page.drawLine({
-                        start: { x: p1.x, y: pageHeight - p1.y },
-                        end: { x: p2.x, y: pageHeight - p2.y },
-                        thickness: annotation.strokeWidth || 2,
-                        color: strokeRgb,
-                        opacity: annotation.opacity || 1
-                    });
-                }
+                // Use drawSvgPath for smoother lines
+                // Pass pageHeight to getSmoothedPath to handle coordinate flipping (UI top-left -> PDF bottom-left)
+                const pathData = getSmoothedPath(annotation.paths, pageHeight);
+                page.drawSvgPath(pathData, {
+                    x: 0,
+                    y: 0,
+                    borderColor: strokeRgb,
+                    borderWidth: annotation.strokeWidth || 2,
+                    borderOpacity: annotation.opacity || 1,
+                });
             }
 
             // Lines
@@ -149,7 +178,7 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
         }
 
         const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

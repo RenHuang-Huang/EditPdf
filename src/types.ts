@@ -53,7 +53,16 @@ export interface TextOverlayAnnotation extends BaseAnnotation {
     textColor: string;
 }
 
-export type Annotation = TextAnnotation | RectAnnotation | PenAnnotation | LineAnnotation | TextOverlayAnnotation;
+// NEW: Image insertion
+export interface ImageAnnotation extends BaseAnnotation {
+    type: 'image';
+    file: File;        // The image file
+    width: number;
+    height: number;
+    rotation?: number; // Optional rotation
+}
+
+export type Annotation = TextAnnotation | RectAnnotation | PenAnnotation | LineAnnotation | TextOverlayAnnotation | ImageAnnotation;
 
 export interface EditorState {
     scale: number;

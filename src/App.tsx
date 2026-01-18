@@ -6,16 +6,7 @@ import './App.css';
 function App() {
   const [file, setFile] = useState<File | null>(null);
 
-  const loadTestPdf = async () => {
-    try {
-      const response = await fetch('/test.pdf');
-      const blob = await response.blob();
-      const testFile = new File([blob], 'test.pdf', { type: 'application/pdf' });
-      setFile(testFile);
-    } catch (e) {
-      alert('Failed to load test.pdf');
-    }
-  };
+
 
   return (
     <div className="app-container">
