@@ -8,6 +8,9 @@ import {
     setLineWidth,
     pushGraphicsState,
     popGraphicsState,
+    setGraphicsState,
+    PDFName,
+    PDFDict
 } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { getFlattenedPoints } from './geometry';
@@ -183,19 +186,56 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                 // 3. Use L commands (robust, visible) instead of Q
                 // 4. Strict "No Fill" (No spiderweb)
 
-                // Cycle 15 Fix: Raw PDF Operators (The "Nuclear" Option)
-                // Bypasses drawSvgPath entirely to guarantee visibility and single-stroke (no dots).
+                // Cycle 15+16 Fix: Raw PDF Operators with Transparency
+                // 1. "Nuclear" Path (moveTo/lineTo) -> Guarantees visibility/smoothness
+                // 2. ExtGState -> Guarantees transparency
 
                 const flatPoints = getFlattenedPoints(annotation.paths);
                 if (flatPoints.length > 1) {
                     const ops = [];
                     ops.push(pushGraphicsState());
+
+                    // Cycle 16: Handle Transparency manually
+                    const opacity = annotation.opacity !== undefined ? annotation.opacity : 1;
+                    if (opacity < 1) {
+                        try {
+                            const alphaName = `GS_Alpha_${Math.floor(opacity * 100)}`;
+                            const pdfName = PDFName.of(alphaName);
+
+                            // Check/Create Resources.ExtGState
+                            let resources = page.node.Resources();
+                            if (!resources) {
+                                resources = pdfDoc.context.obj({});
+                                page.node.set(PDFName.of('Resources'), resources);
+                            }
+
+                            let extGState = resources.get(PDFName.of('ExtGState'));
+                            if (!extGState || !(extGState instanceof PDFDict)) {
+                                extGState = pdfDoc.context.obj({});
+                                resources.set(PDFName.of('ExtGState'), extGState);
+                            }
+
+                            if (extGState instanceof PDFDict) {
+                                // Create logic only if not exists (optimization)
+                                if (!extGState.has(pdfName)) {
+                                    const dict = pdfDoc.context.obj({
+                                        Type: 'ExtGState',
+                                        CA: opacity, // Stroke Alpha
+                                        ca: opacity  // Fill Alpha
+                                    });
+                                    extGState.set(pdfName, pdfDoc.context.register(dict));
+                                }
+
+                                // Apply State
+                                ops.push(setGraphicsState(alphaName));
+                            }
+                        } catch (e) {
+                            console.warn('Failed to set transparency for raw path:', e);
+                        }
+                    }
+
                     ops.push(setStrokingColor(strokeRgb));
                     ops.push(setLineWidth(annotation.strokeWidth || 2));
-
-                    // Note: Transparency with raw operators usually requires ExtGState registration.
-                    // For now, we prioritize VISIBILITY. If this draws opaque, it's better than invisible.
-                    // However, we can try to rely on inherited graphics state? Unlikely.
 
                     ops.push(moveTo(flatPoints[0].x, pageHeight - flatPoints[0].y));
 
