@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    MousePointer2, Type, PenTool, Square, Minus, Download, Slash, FileText, ScanText,
+    MousePointer2, Type, PenTool, Square, Minus, Download, Slash,
     Highlighter, Undo2, Redo2, ZoomIn, ZoomOut
 } from 'lucide-react';
 import type { EditorState, FontFamily } from '../types';
@@ -10,8 +10,6 @@ interface ToolbarProps {
     state: EditorState;
     onStateChange: React.Dispatch<React.SetStateAction<EditorState>>;
     onExport: () => void;
-    onExportWord: () => void;
-    onOCR: () => void;  // NEW: OCR功能
     onZoomIn: () => void;
     onZoomOut: () => void;
 }
@@ -22,8 +20,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     state,
     onStateChange,
     onExport,
-    onExportWord,
-    onOCR,
     onZoomIn,
     onZoomOut
 }) => {
@@ -167,16 +163,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <button className="action-btn primary" onClick={onExport}>
                     <Download size={18} />
                     <span>Export PDF</span>
-                </button>
-
-                <button className="action-btn" onClick={onExportWord} title="匯出為 Word 文檔 (.docx)">
-                    <FileText size={18} />
-                    <span>Export Word</span>
-                </button>
-
-                <button className="action-btn" onClick={onOCR} title="OCR 文字辨識">
-                    <ScanText size={18} />
-                    <span>OCR</span>
                 </button>
             </div>
         </div>

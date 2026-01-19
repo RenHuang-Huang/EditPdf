@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
-import type { Annotation, EditorState, ToolType, TextAnnotation, FontFamily } from '../types';
+import type { Annotation, EditorState, ToolType, FontFamily } from '../types';
 import { PdfPage } from './PdfPage';
 import { Toolbar } from './Toolbar';
 import { LoadingOverlay } from './LoadingOverlay';
@@ -9,8 +9,6 @@ import { AnnotationsPanel } from './AnnotationsPanel';
 import { StatusBar } from './StatusBar';
 
 import { savePdf } from '../utils/pdfUtils';
-import { exportToWord } from '../utils/wordExport';
-import { performOCR, initOCR } from '../utils/ocrUtils';
 import { nanoid } from 'nanoid';
 import './PdfEditor.css';
 
@@ -409,72 +407,6 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         }
     };
 
-    const handleExportWord = async () => {
-        setIsExporting(true);
-        setLoadingMessage('正在匯出 Word...');
-        try {
-            const baseName = file.name.replace(/\.pdf$/i, '');
-            const filename = `${baseName}.docx`;
-            await exportToWord(annotations, filename);
-        } catch (error) {
-            console.error('Failed to export Word:', error);
-            alert(`匯出 Word 失敗: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
-    const handleOCR = async () => {
-        setIsExporting(true);
-        setLoadingMessage('正在初始化 OCR...');
-        try {
-            // Get the canvas element for current page
-            const canvas = document.querySelector('.react-pdf__Page canvas') as HTMLCanvasElement;
-            if (!canvas) {
-                throw new Error('找不到 PDF 頁面');
-            }
-
-            console.log('Initializing OCR...');
-            await initOCR((progress) => {
-                setLoadingMessage(`OCR 初始化: ${Math.round(progress * 100)}%`);
-                console.log(`OCR Init: ${Math.round(progress * 100)}%`);
-            });
-
-            const text = await performOCR(canvas, (progress) => {
-                const pct = Math.round(progress * 100);
-                setLoadingMessage(`文字辨識中: ${pct}%`);
-                console.log(`Recognition: ${pct}%`);
-            });
-
-            // Create text annotation from OCR result
-            if (text.trim()) {
-                const newAnnotation: TextAnnotation = {
-                    id: nanoid(),
-                    type: 'text',
-                    page: activePage,
-                    x: 50,
-                    y: 50,
-                    text: `OCR 結果:\n${text.trim()}`,
-                    fontSize: 12,
-                    fontFamily: 'Noto Sans TC',
-                    strokeColor: '#000000',
-                    strokeWidth: 1
-                };
-                addAnnotation(newAnnotation);
-                setLoadingMessage('OCR 完成！');
-                await new Promise(r => setTimeout(r, 500));
-                alert(`OCR 完成！辨識到 ${text.length} 個字元`);
-            } else {
-                alert('OCR 未辨識到文字');
-            }
-        } catch (error) {
-            console.error('OCR failed:', error);
-            alert(`OCR 失敗: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
     // Drop Handler for Images
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -536,8 +468,6 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 state={state}
                 onStateChange={setEditorState}
                 onExport={handleExport}
-                onExportWord={handleExportWord}
-                onOCR={handleOCR}
                 onZoomIn={() => setState(s => ({ ...s, scale: s.scale + 0.1 }))}
                 onZoomOut={() => setState(s => ({ ...s, scale: Math.max(0.1, s.scale - 0.1) }))}
             />
