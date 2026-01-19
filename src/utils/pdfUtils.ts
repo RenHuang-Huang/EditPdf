@@ -117,7 +117,8 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
 
                 page.drawText(overlay.editedText, {
                     x: overlay.x,
-                    y: pageHeight - overlay.y,
+                    // Adjust for baseline
+                    y: pageHeight - overlay.y - (overlay.fontSize * 0.75),
                     size: overlay.fontSize,
                     font: font,
                     color: rgb(
@@ -142,7 +143,7 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
 
                 page.drawText(annotation.text, {
                     x: annotation.x,
-                    y: pageHeight - annotation.y,
+                    y: pageHeight - annotation.y - ((annotation.fontSize || 16) * 0.75),
                     size: annotation.fontSize || 16,
                     font: font,
                     color: rgb(
