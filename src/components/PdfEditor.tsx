@@ -7,7 +7,7 @@ import { LoadingOverlay } from './LoadingOverlay';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { AnnotationsPanel } from './AnnotationsPanel';
 import { StatusBar } from './StatusBar';
-import { PageNavigation } from './PageNavigation';
+
 import { savePdf } from '../utils/pdfUtils';
 import { exportToWord } from '../utils/wordExport';
 import { performOCR, initOCR } from '../utils/ocrUtils';
@@ -26,6 +26,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
     const [numPages, setNumPages] = useState<number>(0);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [isExporting, setIsExporting] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState('處理中...'); // New state
     const [showHelp, setShowHelp] = useState(false);
     const [state, setState] = useState<EditorState>({
         scale: 1.0,
@@ -38,8 +39,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         activeFontFamily: 'Helvetica',
         activeOpacity: 0.4,
     });
-    const [rotation, setRotation] = useState(0);
-    const [searchQuery, setSearchQuery] = useState('');
+
 
     const [activePage, setActivePage] = useState<number>(1);
     const clipboardRef = useRef<Annotation | null>(null);
@@ -141,6 +141,20 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         addToHistory(newAnnotations);
     };
 
+    const reorderAnnotations = (draggedId: string, targetId: string) => {
+        const fromIndex = annotations.findIndex(a => a.id === draggedId);
+        const toIndex = annotations.findIndex(a => a.id === targetId);
+
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+        const newAnnotations = [...annotations];
+        const [movedItem] = newAnnotations.splice(fromIndex, 1);
+        newAnnotations.splice(toIndex, 0, movedItem);
+
+        setAnnotations(newAnnotations);
+        addToHistory(newAnnotations);
+    };
+
     const handlePageFocus = (pageNum: number) => {
         setActivePage(pageNum);
     };
@@ -160,6 +174,56 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         }
     };
 
+    // Sync Selection -> Toolbar State
+    useEffect(() => {
+        if (!state.selectedId) return;
+
+        const ann = annotations.find(a => a.id === state.selectedId);
+        if (!ann) return;
+
+        setState(prev => {
+            // Only update if changed to avoid unnecessary re-renders
+            const next = { ...prev };
+            let changed = false;
+
+            if (ann.strokeColor && ann.strokeColor !== prev.activeStrokeColor) {
+                next.activeStrokeColor = ann.strokeColor;
+                changed = true;
+            }
+            if (ann.strokeWidth && ann.strokeWidth !== prev.activeStrokeWidth) {
+                next.activeStrokeWidth = ann.strokeWidth;
+                changed = true;
+            }
+            if (ann.opacity !== undefined && ann.opacity !== prev.activeOpacity) {
+                next.activeOpacity = ann.opacity;
+                changed = true;
+            }
+            // Text properties
+            if (ann.type === 'text') {
+                if (ann.fontSize && ann.fontSize !== prev.activeFontSize) {
+                    next.activeFontSize = ann.fontSize;
+                    changed = true;
+                }
+                if (ann.fontFamily && ann.fontFamily !== prev.activeFontFamily) {
+                    next.activeFontFamily = ann.fontFamily as FontFamily;
+                    changed = true;
+                }
+            }
+            // Fill Color (Rect/Pen)
+            if (ann.fillColor && ann.fillColor !== prev.activeFillColor) {
+                next.activeFillColor = ann.fillColor;
+                changed = true;
+            } else if (ann.type === 'rect' && !ann.fillColor && prev.activeFillColor !== 'transparent') {
+                // If rect has no fill (undefined), treat as transparent?
+                // Or just ignore if it's undefined.
+                // Let's assume 'transparent' for undefined if previously set.
+            }
+
+            return changed ? next : prev;
+        });
+    }, [state.selectedId, annotations]); // Sync when selection changes or annotation updates (e.g. verify sync)
+
+    // Keyboard Shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const isCtrlOrCmd = e.ctrlKey || e.metaKey;
@@ -297,10 +361,38 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [state.selectedId, annotations, activePage, showHelp]); // Depend on activePage to know where to paste
+    }, [state.selectedId, annotations, activePage, showHelp]);
+
+    // Better approach: Separate handler for internal set state, and side effect
+    const setEditorState: React.Dispatch<React.SetStateAction<EditorState>> = (action) => {
+        const next = typeof action === 'function' ? action(state) : action;
+
+        if (next.selectedId) {
+            const updates: any = {}; // Use any to bypass union type restrictions for specific props
+            const prev = state; // Use current state as prev
+
+            if (next.activeStrokeColor !== prev.activeStrokeColor) updates.strokeColor = next.activeStrokeColor;
+            if (next.activeStrokeWidth !== prev.activeStrokeWidth) updates.strokeWidth = next.activeStrokeWidth;
+            if (next.activeFillColor !== prev.activeFillColor) updates.fillColor = next.activeFillColor;
+            if (next.activeOpacity !== prev.activeOpacity) updates.opacity = next.activeOpacity;
+
+            // Text specific
+            if (next.activeFontSize !== prev.activeFontSize) updates.fontSize = next.activeFontSize;
+            if (next.activeFontFamily !== prev.activeFontFamily) updates.fontFamily = next.activeFontFamily;
+
+            if (Object.keys(updates).length > 0) {
+                updateAnnotation(next.selectedId!, updates);
+            }
+        }
+        setState(next);
+    };
+
+    // ... (rest of code)
+
 
     const handleExport = async () => {
         setIsExporting(true);
+        setLoadingMessage('正在匯出 PDF...');
         try {
             await savePdf(file, annotations);
         } catch (error) {
@@ -313,8 +405,10 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
 
     const handleExportWord = async () => {
         setIsExporting(true);
+        setLoadingMessage('正在匯出 Word...');
         try {
-            const filename = file.name.replace(/\.pdf$/i, '.docx');
+            const baseName = file.name.replace(/\.pdf$/i, '');
+            const filename = `${baseName}.docx`;
             await exportToWord(annotations, filename);
         } catch (error) {
             console.error('Failed to export Word:', error);
@@ -325,7 +419,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
     };
 
     const handleOCR = async () => {
-        setIsExporting(true); // Reuse loading overlay
+        setIsExporting(true);
+        setLoadingMessage('正在初始化 OCR...');
         try {
             // Get the canvas element for current page
             const canvas = document.querySelector('.react-pdf__Page canvas') as HTMLCanvasElement;
@@ -333,13 +428,16 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 throw new Error('找不到 PDF 頁面');
             }
 
-            // Initialize and perform OCR
+            console.log('Initializing OCR...');
             await initOCR((progress) => {
-                console.log(`OCR 進度: ${Math.round(progress * 100)}%`);
+                setLoadingMessage(`OCR 初始化: ${Math.round(progress * 100)}%`);
+                console.log(`OCR Init: ${Math.round(progress * 100)}%`);
             });
 
             const text = await performOCR(canvas, (progress) => {
-                console.log(`辨識進度: ${Math.round(progress * 100)}%`);
+                const pct = Math.round(progress * 100);
+                setLoadingMessage(`文字辨識中: ${pct}%`);
+                console.log(`Recognition: ${pct}%`);
             });
 
             // Create text annotation from OCR result
@@ -357,6 +455,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                     strokeWidth: 1
                 };
                 addAnnotation(newAnnotation);
+                setLoadingMessage('OCR 完成！');
+                await new Promise(r => setTimeout(r, 500));
                 alert(`OCR 完成！辨識到 ${text.length} 個字元`);
             } else {
                 alert('OCR 未辨識到文字');
@@ -384,21 +484,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
 
         if (imageFiles.length === 0) return;
 
-        // Get drop coordinates relative to the viewport/page?
-        // This is tricky because drop event target might be the document wrapper.
-        // For simplicity, let's just add it to the active page at (50, 50).
-        // Or try to infer page?
-
-        // Let's assume activePage for now.
         const file = imageFiles[0];
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
 
         img.onload = () => {
-            // Default size, but limit if too huge
             let w = img.width;
             let h = img.height;
-            const maxSize = 200; // reasonable default size
+            const maxSize = 200;
 
             if (w > h && w > maxSize) {
                 h = (h * maxSize) / w;
@@ -412,7 +505,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 id: nanoid(),
                 type: 'image',
                 page: activePage,
-                x: 100, // Default position
+                x: 100,
                 y: 100,
                 width: w,
                 height: h,
@@ -435,7 +528,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
         >
             <Toolbar
                 state={state}
-                onStateChange={setState}
+                onStateChange={setEditorState}
                 onExport={handleExport}
                 onExportWord={handleExportWord}
                 onOCR={handleOCR}
@@ -443,15 +536,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 onZoomOut={() => setState(s => ({ ...s, scale: Math.max(0.1, s.scale - 0.1) }))}
             />
 
-            <PageNavigation
-                currentPage={activePage}
-                totalPages={numPages}
-                rotation={rotation}
-                onPageChange={setActivePage}
-                onRotate={(dir) => setRotation(r => dir === 'cw' ? (r + 90) % 360 : (r - 90 + 360) % 360)}
-                onSearch={setSearchQuery}
-                searchQuery={searchQuery}
-            />
+
 
             <div className="pdf-viewport">
                 <div className="pdf-document">
@@ -489,6 +574,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 }}
                 onDeleteAnnotation={deleteAnnotation}
                 onEditAnnotation={editAnnotation}
+                onReorder={reorderAnnotations}
             />
 
             <StatusBar
@@ -499,7 +585,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 scale={state.scale}
             />
 
-            {isExporting && <LoadingOverlay message="正在匯出 PDF..." />}
+            {isExporting && <LoadingOverlay message={loadingMessage} />}
             {showHelp && <KeyboardShortcutsModal onClose={() => setShowHelp(false)} />}
         </div>
     );

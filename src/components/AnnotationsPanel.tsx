@@ -9,6 +9,7 @@ interface AnnotationsPanelProps {
     onSelectAnnotation: (id: string, page: number) => void;
     onDeleteAnnotation: (id: string) => void;
     onEditAnnotation: (id: string) => void;
+    onReorder: (draggedId: string, targetId: string) => void;
     selectedId: string | null;
 }
 
@@ -18,6 +19,7 @@ export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
     onSelectAnnotation,
     onDeleteAnnotation,
     onEditAnnotation,
+    onReorder,
     selectedId
 }) => {
     const getAnnotationIcon = (type: string) => {
@@ -74,10 +76,26 @@ export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
                                 Page {pageNum} ({pageAnnotations.length})
                             </div>
                             <div className="annotation-list">
-                                {pageAnnotations.map(ann => (
+                                {[...pageAnnotations].reverse().map(ann => (
                                     <div
                                         key={ann.id}
                                         className={`annotation-item ${selectedId === ann.id ? 'selected' : ''}`}
+                                        draggable="true"
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('text/plain', ann.id);
+                                            e.dataTransfer.effectAllowed = 'move';
+                                        }}
+                                        onDragOver={(e) => {
+                                            e.preventDefault(); // Allow drop
+                                            e.dataTransfer.dropEffect = 'move';
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            const draggedId = e.dataTransfer.getData('text/plain');
+                                            if (draggedId !== ann.id) {
+                                                onReorder(draggedId, ann.id);
+                                            }
+                                        }}
                                         onClick={() => onSelectAnnotation(ann.id, ann.page)}
                                         onDoubleClick={() => {
                                             if (ann.type === 'text') {

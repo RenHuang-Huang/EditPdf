@@ -1,27 +1,16 @@
-import { useState } from 'react';
-import { UploadZone } from './components/UploadZone';
-import { PdfEditor } from './components/PdfEditor';
-import './App.css';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { LandingPage } from './pages/LandingPage';
+import { EditorPage } from './pages/EditorPage';
+import './App.css'; // Global styles if any, or remove if specific to EditorPage
 
 function App() {
-  const [file, setFile] = useState<File | null>(null);
-
-
-
   return (
-    <div className="app-container">
-      {!file ? (
-        <div className="upload-container">
-          <header className="app-header">
-            <h1>PDF 編輯器</h1>
-            <p>免費、免上傳，直接在瀏覽器中編輯您的 PDF。</p>
-          </header>
-          <UploadZone onFileSelect={setFile} />
-        </div>
-      ) : (
-        <PdfEditor file={file} onBack={() => setFile(null)} />
-      )}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<EditorPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

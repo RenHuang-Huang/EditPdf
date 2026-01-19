@@ -49,16 +49,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     <button className={`tool-btn ${state.activeTool === 'text' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'text' })} title="Text (T)">
                         <Type size={18} />
                     </button>
-                    <button className={`tool-btn ${state.activeTool === 'rect' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'rect' })} title="Rectangle (R)">
+                    <button className={`tool-btn ${state.activeTool === 'rect' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'rect', activeStrokeWidth: 2, activeOpacity: 1 })} title="Rectangle (R)">
                         <Square size={18} />
                     </button>
-                    <button className={`tool-btn ${state.activeTool === 'line' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'line' })} title="Line (L)">
+                    <button className={`tool-btn ${state.activeTool === 'line' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'line', activeStrokeWidth: 2, activeOpacity: 1 })} title="Line (L)">
                         <Minus size={18} />
                     </button>
-                    <button className={`tool-btn ${state.activeTool === 'pen' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'pen' })} title="Pen (P)">
+                    <button className={`tool-btn ${state.activeTool === 'pen' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'pen', activeStrokeWidth: 2, activeOpacity: 1 })} title="Pen (P)">
                         <PenTool size={18} />
                     </button>
-                    <button className={`tool-btn ${state.activeTool === 'highlighter' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'highlighter' })} title="Highlighter (H)">
+                    <button className={`tool-btn ${state.activeTool === 'highlighter' ? 'active' : ''}`} onClick={() => updateState({ activeTool: 'highlighter', activeStrokeWidth: 20, activeOpacity: 0.4 })} title="Highlighter (H)">
                         <Highlighter size={18} />
                     </button>
                 </div>

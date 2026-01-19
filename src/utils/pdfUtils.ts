@@ -1,7 +1,7 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
-import { getSmoothedPath } from './geometry';
+
 
 /**
  * Enhanced PDF export with text overlay support
@@ -80,7 +80,11 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                 });
 
                 // 2. Draw new text
-                const font = overlay.fontFamily.includes('Noto') ? chineseFont : helveticaFont;
+                // Check for non-Latin characters to decide font
+                // eslint-disable-next-line no-control-regex
+                const hasNonLatin = /[^\u0000-\u007F]/.test(overlay.editedText);
+                const font = (hasNonLatin && chineseFont) ? chineseFont : helveticaFont;
+
                 page.drawText(overlay.editedText, {
                     x: overlay.x,
                     y: pageHeight - overlay.y,
@@ -97,7 +101,10 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
 
             // Original annotation handling (text, rect, pen, etc.)
             if (annotation.type === 'text' && annotation.text) {
-                const font = annotation.fontFamily?.includes('Noto') ? chineseFont : helveticaFont;
+                // eslint-disable-next-line no-control-regex
+                const hasNonLatin = /[^\u0000-\u007F]/.test(annotation.text);
+                const font = (hasNonLatin && chineseFont) ? chineseFont : helveticaFont;
+
                 page.drawText(annotation.text, {
                     x: annotation.x,
                     y: pageHeight - annotation.y,
@@ -147,16 +154,35 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     parseInt(annotation.strokeColor!.slice(5, 7), 16) / 255
                 );
 
-                // Use drawSvgPath for smoother lines
-                // Pass pageHeight to getSmoothedPath to handle coordinate flipping (UI top-left -> PDF bottom-left)
-                const pathData = getSmoothedPath(annotation.paths, pageHeight);
-                page.drawSvgPath(pathData, {
-                    x: 0,
-                    y: 0,
-                    borderColor: strokeRgb,
-                    borderWidth: annotation.strokeWidth || 2,
-                    borderOpacity: annotation.opacity || 1,
-                });
+                // Handle single point (Dot)
+                if (annotation.paths.length === 1) {
+                    const point = annotation.paths[0];
+                    page.drawCircle({
+                        x: point.x,
+                        y: pageHeight - point.y,
+                        size: (annotation.strokeWidth || 2) / 2,
+                        color: strokeRgb,
+                        opacity: annotation.opacity || 1,
+                        borderWidth: 0
+                    });
+                    continue;
+                }
+
+                // Fallback to Manual Line Drawing for maximum reliability
+                // (drawSvgPath can sometimes be finicky with specific params or opacity)
+                for (let i = 0; i < annotation.paths.length - 1; i++) {
+                    const p1 = annotation.paths[i];
+                    const p2 = annotation.paths[i + 1];
+
+                    page.drawLine({
+                        start: { x: p1.x, y: pageHeight - p1.y },
+                        end: { x: p2.x, y: pageHeight - p2.y },
+                        thickness: annotation.strokeWidth || 2,
+                        color: strokeRgb,
+                        opacity: annotation.opacity || 1,
+                        lineCap: 1 // Round
+                    });
+                }
             }
 
             // Lines
@@ -182,7 +208,8 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = file.name.replace('.pdf', '_edited.pdf');
+        const baseName = file.name.replace(/\.pdf$/i, '');
+        link.download = `${baseName}_edit.pdf`;
         link.click();
         URL.revokeObjectURL(url);
     } catch (error) {

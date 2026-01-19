@@ -14,17 +14,26 @@ export async function initOCR(onProgress?: (progress: number) => void): Promise<
     if (worker) return; // Already initialized
 
     try {
-        worker = await createWorker({
-            logger: (m) => {
-                if (onProgress && m.status === 'recognizing text') {
-                    onProgress(m.progress);
+        // Tesseract.js v6+ API: createWorker(langs, oem, options)
+        worker = await createWorker('chi_tra+eng', 1, {
+            logger: (m: any) => {
+                console.log('[Tesseract]', m.status, m.progress);
+                if (onProgress) {
+                    // Normalize progress based on status
+                    if (m.status === 'loading tesseract core') {
+                        onProgress(0.1 + (m.progress || 0) * 0.1);
+                    } else if (m.status === 'loading language traineddata') {
+                        onProgress(0.2 + (m.progress || 0) * 0.2);
+                    } else if (m.status === 'initializing api') {
+                        onProgress(0.5);
+                    } else if (m.status === 'recognizing text') {
+                        onProgress(0.5 + (m.progress || 0) * 0.5);
+                    } else {
+                        onProgress(0.1); // generic activity
+                    }
                 }
             }
         });
-
-        // Load Chinese Traditional + English
-        await worker.loadLanguage('chi_tra+eng');
-        await worker.initialize('chi_tra+eng');
 
         console.log('OCR initialized successfully');
     } catch (error) {

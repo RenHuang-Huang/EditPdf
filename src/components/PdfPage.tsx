@@ -29,9 +29,14 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [drawingId, setDrawingId] = useState<string | null>(null);
+    const drawingIdRef = useRef<string | null>(null);
     const [dragState, setDragState] = useState<{ id: string, offsetX: number, offsetY: number } | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null); // New: Track which text is being edited
 
-    // Helper to get relative coordinates
+    useEffect(() => {
+        drawingIdRef.current = drawingId;
+    }, [drawingId]);
+
     const getRelativeCoords = (e: React.MouseEvent) => {
         if (!containerRef.current) return { x: 0, y: 0 };
         const rect = containerRef.current.getBoundingClientRect();
@@ -45,30 +50,35 @@ export const PdfPage: React.FC<PdfPageProps> = ({
         const coords = getRelativeCoords(e);
         if (!coords) return;
 
-        // Click-to-deselect: if 'select' tool is active and user clicks background, deselect
+        // If editing text, clicking outside should finish editing
+        if (editingId) {
+            setEditingId(null);
+            return;
+        }
+
         if (toolStr.activeTool === 'select') {
-            // Since individual annotations call e.stopPropagation(), 
-            // any click that reaches here must be on the empty background.
             onSelectAnnotation('');
             return;
         }
 
         if (toolStr.activeTool === 'text') {
-            const text = prompt('請輸入文字:');
-            if (text && text.trim()) {
-                onAddAnnotation({
-                    id: nanoid(),
-                    type: 'text',
-                    page: pageNumber,
-                    x: coords.x,
-                    y: coords.y,
-                    text: text,
-                    fontSize: toolStr.activeFontSize,
-                    fontFamily: toolStr.activeFontFamily,
-                    strokeColor: toolStr.activeStrokeColor,
-                    strokeWidth: 1
-                });
-            }
+            const newId = nanoid();
+            onAddAnnotation({
+                id: newId,
+                type: 'text',
+                page: pageNumber,
+                x: coords.x,
+                y: coords.y,
+                text: '輸入文字',  // Placeholder
+                fontSize: toolStr.activeFontSize,
+                fontFamily: toolStr.activeFontFamily,
+                strokeColor: toolStr.activeStrokeColor,
+                strokeWidth: 1
+            });
+            // Enter edit mode immediately
+            setEditingId(newId);
+            // Also select it to allow dragging
+            onSelectAnnotation(newId);
             return;
         }
 
@@ -88,6 +98,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 opacity: toolStr.activeOpacity
             });
             setDrawingId(newId);
+            drawingIdRef.current = newId;
             return;
         }
 
@@ -105,6 +116,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 opacity: toolStr.activeOpacity
             });
             setDrawingId(newId);
+            drawingIdRef.current = newId;
             return;
         }
 
@@ -122,6 +134,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 strokeWidth: toolStr.activeStrokeWidth
             });
             setDrawingId(newId);
+            drawingIdRef.current = newId;
         }
     };
 
@@ -130,6 +143,10 @@ export const PdfPage: React.FC<PdfPageProps> = ({
 
         e.stopPropagation();
         onSelectAnnotation(id);
+
+        // Double click logic could be handled here, but standard click is fine for now.
+        // Double click logic is now handled by explicit onDoubleClick handlers on elements
+        // if (e.detail === 2) { ... }
 
         const { x, y } = getRelativeCoords(e);
         setDragState({
@@ -146,7 +163,6 @@ export const PdfPage: React.FC<PdfPageProps> = ({
             const current = annotations.find(a => a.id === dragState.id);
             if (!current) return;
 
-            // Handle Rect/Text/Image (Simple x/y update)
             if (current.type === 'text' || current.type === 'rect' || current.type === 'image') {
                 onUpdateAnnotation(dragState.id, {
                     x: x - dragState.offsetX,
@@ -154,7 +170,6 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 });
             }
 
-            // Handle Line - Shift start and end points
             if (current.type === 'line') {
                 const newX = x - dragState.offsetX;
                 const newY = y - dragState.offsetY;
@@ -170,15 +185,9 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 return;
             }
 
-            // Handle Paths (Pen/Highlighter) - Need to shift all points
             if ((current.type === 'pen' || current.type === 'highlighter') && current.paths) {
-                // For paths, we need to update all points relative to the new position
-                // Calculate the delta from the original start point to the new mouse position
                 const newX = x - dragState.offsetX;
                 const newY = y - dragState.offsetY;
-
-                // If this is the first move, calculate the initial offset for all points
-                // Otherwise, calculate delta from previous mouse position
                 const originalFirstPoint = current.paths[0];
                 const deltaX = newX - originalFirstPoint.x;
                 const deltaY = newY - originalFirstPoint.y;
@@ -193,21 +202,22 @@ export const PdfPage: React.FC<PdfPageProps> = ({
             return;
         }
 
-        if (!drawingId) return;
+        const currentDrawingId = drawingIdRef.current;
+        if (!currentDrawingId) return;
 
-        if (toolStr.activeTool === 'pen') {
-            const current = annotations.find(a => a.id === drawingId);
+        if (toolStr.activeTool === 'pen' || toolStr.activeTool === 'highlighter') {
+            const current = annotations.find(a => a.id === currentDrawingId);
             if (current && (current.type === 'pen' || current.type === 'highlighter') && current.paths) {
-                onUpdateAnnotation(drawingId, {
+                onUpdateAnnotation(currentDrawingId, {
                     paths: [...current.paths, { x, y }]
                 });
             }
         }
 
         if (toolStr.activeTool === 'rect') {
-            const current = annotations.find(a => a.id === drawingId);
+            const current = annotations.find(a => a.id === currentDrawingId);
             if (current && current.type === 'rect') {
-                onUpdateAnnotation(drawingId, {
+                onUpdateAnnotation(currentDrawingId, {
                     width: x - current.x,
                     height: y - current.y
                 });
@@ -215,7 +225,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
         }
 
         if (toolStr.activeTool === 'line') {
-            const current = annotations.find(a => a.id === drawingId);
+            const current = annotations.find(a => a.id === currentDrawingId);
             if (current && current.type === 'line') {
                 let finalX = x;
                 let finalY = y;
@@ -223,16 +233,16 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                 if (e.shiftKey) {
                     const startX = current.x;
                     const startY = current.y;
-                    const dx = Math.abs(x - startX);
-                    const dy = Math.abs(y - startY);
-                    if (dx > dy) {
-                        finalY = startY;
-                    } else {
-                        finalX = startX;
-                    }
+                    const dx = x - startX;
+                    const dy = y - startY;
+                    const angle = Math.atan2(dy, dx);
+                    const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    finalX = startX + Math.cos(snapAngle) * dist;
+                    finalY = startY + Math.sin(snapAngle) * dist;
                 }
 
-                onUpdateAnnotation(drawingId, {
+                onUpdateAnnotation(currentDrawingId, {
                     x2: finalX,
                     y2: finalY
                 });
@@ -245,10 +255,10 @@ export const PdfPage: React.FC<PdfPageProps> = ({
             onAnnotationChangeEnd();
         }
         setDrawingId(null);
+        drawingIdRef.current = null;
         setDragState(null);
     };
 
-    // Extract ImageNode to avoid re-creating ObjectURL on every render
     const ImageNode = React.memo(({ ann, isSelected, onMouseDown }: { ann: ImageAnnotation, isSelected: boolean, onMouseDown: (e: React.MouseEvent) => void }) => {
         const [src, setSrc] = useState<string | null>(null);
 
@@ -288,7 +298,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                         height: '100%',
                         objectFit: 'contain',
                         opacity: ann.opacity || 1,
-                        pointerEvents: 'none', // Let dragged events pass to container? No, container has pointerEvents auto.
+                        pointerEvents: 'none',
                         userSelect: 'none'
                     }}
                 />
@@ -321,6 +331,7 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                     };
 
                     if (ann.type === 'text') {
+                        const isEditing = editingId === ann.id;
                         return (
                             <div
                                 key={ann.id}
@@ -334,11 +345,61 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                                     fontFamily: ann.fontFamily || 'Helvetica',
                                     whiteSpace: 'nowrap',
                                     userSelect: 'none',
-                                    pointerEvents: 'auto'
+                                    pointerEvents: 'auto',
+                                    minWidth: '20px',
+                                    minHeight: '20px',
+                                    zIndex: isEditing ? 1000 : undefined // Bring to front when editing
                                 }}
                                 onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.x, ann.y)}
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingId(ann.id);
+                                }}
                             >
-                                {ann.text}
+                                {isEditing ? (
+                                    <textarea
+                                        autoFocus
+                                        defaultValue={ann.text}
+                                        placeholder="輸入文字..."
+                                        style={{
+                                            font: 'inherit',
+                                            color: 'inherit',
+                                            background: 'rgba(255, 255, 255, 0.9)', // Semi-transparent white bg for visibility
+                                            border: '1px solid #2563eb', // Blue border to indicate focus
+                                            borderRadius: '4px',
+                                            outline: 'none',
+                                            resize: 'both',
+                                            overflow: 'hidden',
+                                            minWidth: '100px',
+                                            minHeight: '1.2em',
+                                            whiteSpace: 'pre-wrap', // Allow wrapping
+                                            padding: '4px',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                        }}
+                                        onBlur={(e) => {
+                                            onUpdateAnnotation(ann.id, { text: e.target.value });
+                                            setEditingId(null);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        ref={(el) => {
+                                            // Ensure focus
+                                            if (el) {
+                                                el.focus();
+                                                // Move cursor to end
+                                                el.setSelectionRange(el.value.length, el.value.length);
+                                            }
+                                        }}
+                                    />
+                                ) : (
+                                    ann.text
+                                )}
                             </div>
                         );
                     }
