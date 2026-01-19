@@ -1,6 +1,6 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { getSmoothedPath } from './geometry';
+import { getFlattenedPoints } from './geometry';
 import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
 
 /**
@@ -168,17 +168,29 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     continue;
                 }
 
-                // Cycle 13 Fix: Use Single SVG Path for smooth, continuous transparency (No Dots)
-                // Strict "No Fill" to avoid web effects
-                const pathData = getSmoothedPath(annotation.paths, pageHeight);
+                // Cycle 14 Fix: "Mega Path" / Polyline
+                // 1. Flatten curve to many small segments (high fidelity)
+                // 2. Join into ONE single SVG path "M ... L ... L ..." (No dots)
+                // 3. Use L commands (robust, visible) instead of Q
+                // 4. Strict "No Fill" (No spiderweb)
 
-                page.drawSvgPath(pathData, {
-                    borderColor: strokeRgb,
-                    borderWidth: annotation.strokeWidth || 2,
-                    color: undefined, // CRITICAL: No Fill
-                    borderOpacity: annotation.opacity || 1,
-                    // Note: 'opacity' prop affects both fill and stroke, 'borderOpacity' is specific line alpha
-                });
+                const flatPoints = getFlattenedPoints(annotation.paths);
+                if (flatPoints.length > 1) {
+                    // Start
+                    let d = `M ${flatPoints[0].x} ${pageHeight - flatPoints[0].y}`;
+
+                    // Connected Lines
+                    for (let i = 1; i < flatPoints.length; i++) {
+                        d += ` L ${flatPoints[i].x} ${pageHeight - flatPoints[i].y}`;
+                    }
+
+                    page.drawSvgPath(d, {
+                        borderColor: strokeRgb,
+                        borderWidth: annotation.strokeWidth || 2,
+                        color: undefined, // CRITICAL: No Fill
+                        borderOpacity: annotation.opacity || 1,
+                    });
+                }
             }
 
             // Lines
