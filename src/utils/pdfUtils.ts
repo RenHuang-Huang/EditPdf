@@ -1,7 +1,7 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { getSmoothedPath } from './geometry';
 import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
-
 
 /**
  * Enhanced PDF export with text overlay support
@@ -168,21 +168,16 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     continue;
                 }
 
-                // Fallback to Manual Line Drawing for maximum reliability
-                // (drawSvgPath can sometimes be finicky with specific params or opacity)
-                for (let i = 0; i < annotation.paths.length - 1; i++) {
-                    const p1 = annotation.paths[i];
-                    const p2 = annotation.paths[i + 1];
+                // Fallback to Manual Line Drawing (Wait, drawSvgPath is better if we configure it correctly for NO FILL)
+                // Use drawSvgPath with correct options to avoid filling
+                const pathData = getSmoothedPath(annotation.paths, pageHeight); // Pass pageHeight to flip Y
 
-                    page.drawLine({
-                        start: { x: p1.x, y: pageHeight - p1.y },
-                        end: { x: p2.x, y: pageHeight - p2.y },
-                        thickness: annotation.strokeWidth || 2,
-                        color: strokeRgb,
-                        opacity: annotation.opacity || 1,
-                        lineCap: 1 // Round
-                    });
-                }
+                page.drawSvgPath(pathData, {
+                    borderColor: strokeRgb,
+                    borderWidth: annotation.strokeWidth || 2,
+                    color: undefined, // CRITICAL: Prevent filling
+                    opacity: annotation.opacity || 1,
+                });
             }
 
             // Lines

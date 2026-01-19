@@ -439,39 +439,87 @@ export const PdfPage: React.FC<PdfPageProps> = ({
                     if ((ann.type === 'pen' || ann.type === 'highlighter') && ann.paths) {
                         const pathData = getSmoothedPath(ann.paths);
                         return (
-                            <svg key={ann.id} className={`annotation path-container ${isSelected ? 'selected' : ''}`} style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                                <path
-                                    d={pathData}
-                                    stroke={ann.strokeColor}
-                                    strokeWidth={ann.strokeWidth || 2}
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    opacity={ann.opacity || 0.4}
-                                    className="annotation-path"
-                                    style={{ pointerEvents: 'stroke', cursor: toolStr.activeTool === 'select' ? 'move' : 'pointer' }}
-                                    onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.paths![0].x, ann.paths![0].y)}
-                                />
-                            </svg>
+                            <div key={ann.id} style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', top: 0, left: 0 }}>
+                                <svg
+                                    className="annotation path-container"
+                                    style={{ overflow: 'visible', width: '100%', height: '100%' }}
+                                >
+                                    <path
+                                        d={pathData}
+                                        stroke={ann.strokeColor}
+                                        strokeWidth={ann.strokeWidth || 2}
+                                        fill="none"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        opacity={ann.opacity || 0.4}
+                                        className="annotation-path"
+                                        style={{ pointerEvents: 'stroke', cursor: toolStr.activeTool === 'select' ? 'move' : 'pointer' }}
+                                        onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.paths![0].x, ann.paths![0].y)}
+                                    />
+                                </svg>
+                                {isSelected && (() => {
+                                    // Calculate bounds
+                                    const xs = ann.paths!.map(p => p.x);
+                                    const ys = ann.paths!.map(p => p.y);
+                                    const minX = Math.min(...xs);
+                                    const maxX = Math.max(...xs);
+                                    const minY = Math.min(...ys);
+                                    const maxY = Math.max(...ys);
+                                    const padding = 4;
+                                    return (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                left: minX - padding,
+                                                top: minY - padding,
+                                                width: maxX - minX + padding * 2,
+                                                height: maxY - minY + padding * 2,
+                                                border: '2px solid #3b82f6',
+                                                pointerEvents: 'none',
+                                                boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.2)'
+                                            }}
+                                        />
+                                    );
+                                })()}
+                            </div>
                         );
                     }
 
                     if (ann.type === 'line' && ann.x2 !== undefined && ann.y2 !== undefined) {
                         return (
-                            <svg key={ann.id} className={`annotation line-container ${isSelected ? 'selected' : ''}`} style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                                <line
-                                    x1={ann.x}
-                                    y1={ann.y}
-                                    x2={ann.x2}
-                                    y2={ann.y2}
-                                    stroke={ann.strokeColor}
-                                    strokeWidth={ann.strokeWidth || 2}
-                                    strokeLinecap="round"
-                                    className="annotation-line"
-                                    style={{ pointerEvents: 'stroke', cursor: toolStr.activeTool === 'select' ? 'move' : 'pointer' }}
-                                    onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.x, ann.y)}
-                                />
-                            </svg>
+                            <div key={ann.id} style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', top: 0, left: 0 }}>
+                                <svg
+                                    className="annotation line-container"
+                                    style={{ overflow: 'visible', width: '100%', height: '100%' }}
+                                >
+                                    <line
+                                        x1={ann.x}
+                                        y1={ann.y}
+                                        x2={ann.x2}
+                                        y2={ann.y2}
+                                        stroke={ann.strokeColor}
+                                        strokeWidth={ann.strokeWidth || 2}
+                                        strokeLinecap="round"
+                                        className="annotation-line"
+                                        style={{ pointerEvents: 'stroke', cursor: toolStr.activeTool === 'select' ? 'move' : 'pointer' }}
+                                        onMouseDown={(e) => handleAnnotationMouseDown(e, ann.id, ann.x, ann.y)}
+                                    />
+                                </svg>
+                                {isSelected && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            left: Math.min(ann.x, ann.x2!) - 4,
+                                            top: Math.min(ann.y, ann.y2!) - 4,
+                                            width: Math.abs(ann.x - ann.x2!) + 8,
+                                            height: Math.abs(ann.y - ann.y2!) + 8,
+                                            border: '2px solid #3b82f6',
+                                            pointerEvents: 'none',
+                                            boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.2)'
+                                        }}
+                                    />
+                                )}
+                            </div>
                         );
                     }
 
