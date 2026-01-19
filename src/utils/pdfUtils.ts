@@ -30,16 +30,28 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
         const helveticaFont = await pdfDoc.embedFont('Helvetica');
 
         // Try to load Chinese font if available
-        let chineseFont = helveticaFont;
+        // Try to load Chinese font if available
+        let chineseFont = null;
         try {
-            const notoSansResponse = await fetch('/NotoSansTC-Regular.otf');
+            // Fix: Use BASE_URL to support GitHub Pages subpath
+            const fontUrl = `${import.meta.env.BASE_URL}NotoSansTC-Regular.otf`;
+            console.log('Fetching font from:', fontUrl);
+            const notoSansResponse = await fetch(fontUrl);
+
             if (notoSansResponse.ok) {
                 const notoSansFontBytes = await notoSansResponse.arrayBuffer();
-                chineseFont = await pdfDoc.embedFont(notoSansFontBytes);
+                // Use 'custom' subset to support all characters in the font (essential for huge fonts like Noto Sans)
+                chineseFont = await pdfDoc.embedFont(notoSansFontBytes, { subset: true });
+                console.log('Chinese font loaded successfully');
+            } else {
+                console.error('Failed to fetch Chinese font:', notoSansResponse.status, notoSansResponse.statusText);
             }
-        } catch {
-            console.warn('Chinese font not available, using Helvetica');
+        } catch (e) {
+            console.error('Error loading Chinese font:', e);
         }
+
+        // Fallback or use for mixed content
+        // const fallbackFont = chineseFont || helveticaFont; // Unused
 
         const pages = pdfDoc.getPages();
 
@@ -96,6 +108,11 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                 // Check for non-Latin characters to decide font
                 // eslint-disable-next-line no-control-regex
                 const hasNonLatin = /[^\u0000-\u007F]/.test(overlay.editedText);
+
+                if (hasNonLatin && !chineseFont) {
+                    throw new Error('中文字型載入失敗，無法匯出中文內容。請檢查網路或重新整理頁面。');
+                }
+
                 const font = (hasNonLatin && chineseFont) ? chineseFont : helveticaFont;
 
                 page.drawText(overlay.editedText, {
@@ -116,6 +133,11 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
             if (annotation.type === 'text' && annotation.text) {
                 // eslint-disable-next-line no-control-regex
                 const hasNonLatin = /[^\u0000-\u007F]/.test(annotation.text);
+
+                if (hasNonLatin && !chineseFont) {
+                    throw new Error('中文字型載入失敗，無法匯出中文內容。請檢查網路或重新整理頁面。');
+                }
+
                 const font = (hasNonLatin && chineseFont) ? chineseFont : helveticaFont;
 
                 page.drawText(annotation.text, {
