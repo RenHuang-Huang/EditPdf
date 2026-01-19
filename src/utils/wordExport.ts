@@ -45,18 +45,21 @@ export async function exportToWord(annotations: Annotation[], filename: string):
 
             pageAnns.forEach(ann => {
                 let text = '';
+                let fontSize = 12;
 
                 if (ann.type === 'text') {
                     text = ann.text || '';
+                    if (ann.fontSize) fontSize = ann.fontSize;
                 } else if (ann.type === 'textOverlay') {
                     text = ann.editedText || ann.originalText || '';
+                    if (ann.fontSize) fontSize = ann.fontSize;
                 }
 
                 if (text) {
                     paragraphs.push(new Paragraph({
                         children: [new TextRun({
                             text,
-                            size: ann.fontSize ? ann.fontSize * 2 : 24 // Word uses half-points
+                            size: fontSize * 2 // Word uses half-points
                         })]
                     }));
                 }

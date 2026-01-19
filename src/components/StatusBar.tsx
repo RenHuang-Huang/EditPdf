@@ -24,7 +24,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         'rect': '矩形',
         'line': '直線',
         'highlighter': '螢光筆',
-        'eraser': '橡皮擦'
+        'eraser': '橡皮擦',
+        'textOverlay': '文字編輯'
     };
 
     return (
