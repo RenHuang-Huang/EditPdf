@@ -1,6 +1,6 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { getFlattenedPoints } from './geometry';
+import { getSmoothedPath } from './geometry';
 import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
 
 /**
@@ -168,22 +168,17 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     continue;
                 }
 
-                // Use Flattened Lines for maximum consistency (avoids fill issues with SVG paths)
-                const flatPoints = getFlattenedPoints(annotation.paths);
+                // Cycle 13 Fix: Use Single SVG Path for smooth, continuous transparency (No Dots)
+                // Strict "No Fill" to avoid web effects
+                const pathData = getSmoothedPath(annotation.paths, pageHeight);
 
-                for (let i = 0; i < flatPoints.length - 1; i++) {
-                    const p1 = flatPoints[i];
-                    const p2 = flatPoints[i + 1];
-
-                    page.drawLine({
-                        start: { x: p1.x, y: pageHeight - p1.y },
-                        end: { x: p2.x, y: pageHeight - p2.y },
-                        thickness: annotation.strokeWidth || 2,
-                        color: strokeRgb,
-                        opacity: annotation.opacity || 1,
-                        lineCap: 1 // Round
-                    });
-                }
+                page.drawSvgPath(pathData, {
+                    borderColor: strokeRgb,
+                    borderWidth: annotation.strokeWidth || 2,
+                    color: undefined, // CRITICAL: No Fill
+                    borderOpacity: annotation.opacity || 1,
+                    // Note: 'opacity' prop affects both fill and stroke, 'borderOpacity' is specific line alpha
+                });
             }
 
             // Lines
