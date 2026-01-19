@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
-import type { Annotation, EditorState, ToolType, TextAnnotation } from '../types';
+import type { Annotation, EditorState, ToolType, TextAnnotation, FontFamily } from '../types';
 import { PdfPage } from './PdfPage';
 import { Toolbar } from './Toolbar';
 import { LoadingOverlay } from './LoadingOverlay';
@@ -384,6 +384,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ file }) => {
                 updateAnnotation(next.selectedId!, updates);
             }
         }
+
+        // Auto-deselect when switching to drawing tools
+        if (next.activeTool !== state.activeTool && next.activeTool !== 'select') {
+            next.selectedId = null;
+        }
+
         setState(next);
     };
 
