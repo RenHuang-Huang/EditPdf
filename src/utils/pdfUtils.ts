@@ -40,8 +40,9 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
 
             if (notoSansResponse.ok) {
                 const notoSansFontBytes = await notoSansResponse.arrayBuffer();
-                // Use 'custom' subset to support all characters in the font (essential for huge fonts like Noto Sans)
-                chineseFont = await pdfDoc.embedFont(notoSansFontBytes, { subset: true });
+                // Disable subsetting for now as it causes invisible text issues with CJK OTF fonts in pdf-lib
+                // The file size will be larger, but it ensures text is rendered correctly.
+                chineseFont = await pdfDoc.embedFont(notoSansFontBytes);
                 console.log('Chinese font loaded successfully');
             } else {
                 console.error('Failed to fetch Chinese font:', notoSansResponse.status, notoSansResponse.statusText);
