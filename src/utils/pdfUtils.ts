@@ -1,4 +1,14 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import {
+    PDFDocument,
+    rgb,
+    moveTo,
+    lineTo,
+    stroke,
+    setStrokingColor,
+    setLineWidth,
+    pushGraphicsState,
+    popGraphicsState,
+} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { getFlattenedPoints } from './geometry';
 import type { Annotation, TextOverlayAnnotation, ImageAnnotation } from '../types';
@@ -168,28 +178,35 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
                     continue;
                 }
 
-                // Cycle 14 Fix: "Mega Path" / Polyline
                 // 1. Flatten curve to many small segments (high fidelity)
                 // 2. Join into ONE single SVG path "M ... L ... L ..." (No dots)
                 // 3. Use L commands (robust, visible) instead of Q
                 // 4. Strict "No Fill" (No spiderweb)
 
+                // Cycle 15 Fix: Raw PDF Operators (The "Nuclear" Option)
+                // Bypasses drawSvgPath entirely to guarantee visibility and single-stroke (no dots).
+
                 const flatPoints = getFlattenedPoints(annotation.paths);
                 if (flatPoints.length > 1) {
-                    // Start
-                    let d = `M ${flatPoints[0].x} ${pageHeight - flatPoints[0].y}`;
+                    const ops = [];
+                    ops.push(pushGraphicsState());
+                    ops.push(setStrokingColor(strokeRgb));
+                    ops.push(setLineWidth(annotation.strokeWidth || 2));
 
-                    // Connected Lines
+                    // Note: Transparency with raw operators usually requires ExtGState registration.
+                    // For now, we prioritize VISIBILITY. If this draws opaque, it's better than invisible.
+                    // However, we can try to rely on inherited graphics state? Unlikely.
+
+                    ops.push(moveTo(flatPoints[0].x, pageHeight - flatPoints[0].y));
+
                     for (let i = 1; i < flatPoints.length; i++) {
-                        d += ` L ${flatPoints[i].x} ${pageHeight - flatPoints[i].y}`;
+                        ops.push(lineTo(flatPoints[i].x, pageHeight - flatPoints[i].y));
                     }
 
-                    page.drawSvgPath(d, {
-                        borderColor: strokeRgb,
-                        borderWidth: annotation.strokeWidth || 2,
-                        color: undefined, // CRITICAL: No Fill
-                        borderOpacity: annotation.opacity || 1,
-                    });
+                    ops.push(stroke());
+                    ops.push(popGraphicsState());
+
+                    page.pushOperators(...ops);
                 }
             }
 
@@ -217,7 +234,7 @@ export async function savePdfWithOverlays(file: File, annotations: Annotation[])
         const link = document.createElement('a');
         link.href = url;
         const baseName = file.name.replace(/\.pdf$/i, '');
-        link.download = `${baseName}_edit.pdf`;
+        link.download = `${baseName} _edit.pdf`;
         link.click();
         URL.revokeObjectURL(url);
     } catch (error) {
