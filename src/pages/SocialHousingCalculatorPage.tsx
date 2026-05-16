@@ -88,7 +88,7 @@ export function SocialHousingCalculatorPage() {
                 <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                     <h1 className="text-xl font-bold text-blue-700">社宅計算工具</h1>
                     <div className="flex items-center gap-4">
-                        <Link to="/" className="text-slate-600 hover:text-blue-600">回首頁</Link>
+                        <Link to="/" className="text-slate-600 hover:text-blue-600">社宅首頁</Link>
                         <Link to="/app" className="text-slate-600 hover:text-blue-600">PDF 編輯器</Link>
                     </div>
                 </div>
