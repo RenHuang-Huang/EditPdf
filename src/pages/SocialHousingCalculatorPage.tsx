@@ -118,7 +118,7 @@ export function SocialHousingCalculatorPage() {
 
                 <section className="bg-white border border-slate-200 rounded-2xl p-6">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <h2 className="text-lg font-bold">三方案比較表（給屋主確認）</h2>
+                        <h2 className="text-lg font-bold">三種方案比較表（給屋主確認）</h2>
                         <button
                             type="button"
                             onClick={downloadReport}
@@ -132,7 +132,7 @@ export function SocialHousingCalculatorPage() {
                             <thead>
                                 <tr className="bg-slate-100">
                                     <th className="border border-slate-200 p-2 text-left">方案</th>
-                                    <th className="border border-slate-200 p-2 text-right">每月收入</th>
+                                    <th className="border border-slate-200 p-2 text-right">每月總收入</th>
                                     <th className="border border-slate-200 p-2 text-right">每月淨收入</th>
                                     <th className="border border-slate-200 p-2 text-right">{report.months} 個月淨收入</th>
                                     <th className="border border-slate-200 p-2 text-right">相較無補助差額</th>
