@@ -11,6 +11,9 @@ export function LandingPage() {
                             <span className="text-2xl font-bold text-blue-600">EditPdf</span>
                         </div>
                         <div className="flex items-center space-x-4">
+                            <Link to="/social-housing-calculator" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">
+                                社宅試算工具
+                            </Link>
                             <Link to="/app" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">
                                 進入編輯器
                             </Link>
@@ -41,6 +44,12 @@ export function LandingPage() {
                             className="bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 py-4 rounded-xl font-bold shadow-lg shadow-orange-500/20 transition-all hover:scale-105"
                         >
                             免費開始使用
+                        </Link>
+                        <Link
+                            to="/social-housing-calculator"
+                            className="bg-white hover:bg-slate-100 text-slate-800 text-lg px-8 py-4 rounded-xl font-bold border border-slate-200 transition-all hover:scale-105"
+                        >
+                            社宅計算工具
                         </Link>
                     </div>
                 </div>
